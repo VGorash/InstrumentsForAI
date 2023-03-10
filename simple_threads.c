@@ -12,7 +12,7 @@ int matrix_d[size_n][size_m] = {0};
 
 int i_global = 0;
 
-void init_matrix(int matrix[size_n][size_m]){
+void fill_matrix(int matrix[size_n][size_m]){
     for (int i=0; i<size_n; i++){
         for (int j=0; j<size_m; j++){
             matrix[i][j] = i * size_n + j + 1;
@@ -41,8 +41,8 @@ void* multiply_row(void* params){
 
 int main(){
     pthread_t threads[size_n];
-    init_matrix(matrix_a);
-    init_matrix(matrix_b);
+    fill_matrix(matrix_a);
+    fill_matrix(matrix_b);
     clock_t begin = clock();
     for (int i=0; i<size_n; i++){
         pthread_create(&threads[i], NULL, multiply_row, NULL);
