@@ -3,64 +3,7 @@
 #include <pthread.h>
 #include <malloc.h>
 
-typedef struct matrix_t {
-    float** data;
-    int n;
-    int m;
-} matrix_t;
-
-// создает в пямяти новый объект матрицы
-matrix_t init_matrix(int n, int m){
-    float** data = (float**) malloc(sizeof(float*) * n);
-    for(int i=0; i<n; i++){
-        float* row = (float*) malloc(sizeof(float) * m);
-        data[i] = row;
-    }
-    matrix_t result;
-    result.data = data;
-    result.n = n;
-    result.m = m;
-    return result;
-}
-
-// очищает память
-// мы везде передаем указатели, чтобы не копировать объект
-void delete_matrix(matrix_t* matrix){
-    for(int i=0; i<matrix->n; i++){
-        free(matrix->data[i]);
-    }
-    free(matrix->data);
-}
-
-// заполняет матрицу числами от 1 до n * m
-void fill_matrix(matrix_t* matrix){
-    for (int i=0; i<matrix->n; i++){
-        for (int j=0; j<matrix->m; j++){
-            matrix->data[i][j] = (float) (i * matrix->n + j + 1);
-        }
-    }
-}
-
-// заполняет матрицу нулями
-void fill_matrix_zeros(matrix_t* matrix){
-    for (int i=0; i<matrix->n; i++){
-        for (int j=0; j<matrix->m; j++){
-            matrix->data[i][j] = 0.f;
-        }
-    }
-}
-
-
-// выводит матрицу в консоль
-// указатель константный, так как матрицу мы не изменяем
-void print_matrix(const matrix_t* matrix){
-    for(int i=0; i<matrix->n; i++){
-        for(int j=0; j<matrix->m; j++){
-            printf("%.2f ", matrix->data[i][j]);
-        }
-        printf("\n");
-    }
-}
+#include "matrix.h"
 
 // элементарная операция по умножению одной строки и одного столбца. Возвращает число
 float calculate_element(const matrix_t* a, const matrix_t* b, int i, int j){
@@ -95,7 +38,6 @@ typedef struct task_t{
     const matrix_t* b; // откуда брать столбец
     matrix_t* c; // куда записывать результат
     int i; // номер строки
-    int j; // номер столбца
 } task_t;
 
 // не нашел на C нормальной встроенной реализации очереди. Поэтому делаем свою
@@ -122,7 +64,9 @@ void* worker(void* params){
 
         // выполняем перемножение
         // мьютекс здесь не нужен, так как мы записываем разные элементы матрицы, а исходные матрицы не меняются
-        task.c->data[task.i][task.j] = calculate_element(task.a, task.b, task.i, task.j);
+        for(int j=0; j<task.c->m; j++){
+            task.c->data[task.i][j] = calculate_element(task.a, task.b, task.i, j);
+        }
     }
     return NULL;
 }
@@ -136,7 +80,7 @@ matrix_t multiply_matrices_multiple_threads(const matrix_t* a, const matrix_t* b
 
     queue_t queue;
     // количество элементарных операций
-    queue.elements_count = a->n * b->m;
+    queue.elements_count = a->n;
     // выделяем память под очередь
     queue.data = (task_t*) malloc(sizeof(task_t) * queue.elements_count);
     queue.current_element = 0;
@@ -151,14 +95,11 @@ matrix_t multiply_matrices_multiple_threads(const matrix_t* a, const matrix_t* b
     fill_matrix_zeros(&c);
 
     for (int i=0; i<c.n; i++){
-        for (int j=0; j<c.m; j++){
-            // кладем в очередь новую задачу
-            queue.data[i * c.n + j].a = a;
-            queue.data[i * c.n + j].b = b;
-            queue.data[i * c.n + j].c = &c;
-            queue.data[i * c.n + j].i = i;
-            queue.data[i * c.n + j].j = j;
-        }
+        // кладем в очередь новую задачу
+        queue.data[i].a = a;
+        queue.data[i].b = b;
+        queue.data[i].c = &c;
+        queue.data[i].i = i;
     }
 
     // создаем пул потоков
